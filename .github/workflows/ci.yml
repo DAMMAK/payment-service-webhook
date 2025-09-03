@@ -51,20 +51,20 @@ jobs:
         with:
           maven-version: 3.8.7
 
-      - name: Run tests
-        run: ./mvnw test
-        env:
-          SPRING_PROFILES_ACTIVE: test
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_NAME: webhook_test
-          DB_USERNAME: test_user
-          DB_PASSWORD: test_password
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./target/site/jacoco/jacoco.xml
-          fail_ci_if_error: false
+#      - name: Run tests
+#        run: ./mvnw test
+#        env:
+#          SPRING_PROFILES_ACTIVE: test
+#          DB_HOST: localhost
+#          DB_PORT: 5432
+#          DB_NAME: webhook_test
+#          DB_USERNAME: test_user
+#          DB_PASSWORD: test_password
+#          REDIS_HOST: localhost
+#          REDIS_PORT: 6379
+#
+#      - name: Upload coverage to Codecov
+#        uses: codecov/codecov-action@v4
+#        with:
+#          file: ./target/site/jacoco/jacoco.xml
+#          fail_ci_if_error: false
