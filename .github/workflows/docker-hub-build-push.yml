@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: payment-service-webhook
+  IMAGE_NAME: dammak/payment-service-webhook
 
 jobs:
   build-and-push:
