@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-webhook-service
+  namespace: payment-webhook
+  labels:
+    app: payment-webhook
+spec:
+  selector:
+    app: payment-webhook
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: ClusterIP

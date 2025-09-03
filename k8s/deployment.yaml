@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-webhook-deployment
+  namespace: payment-webhook
+  labels:
+    app: payment-webhook
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: payment-webhook
+  template:
+    metadata:
+      labels:
+        app: payment-webhook
+    spec:
+      containers:
+      - name: payment-webhook
+        image: payment-service-webhook:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "kubernetes"
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: payment-webhook-config
+              key: db.host
+        - name: DB_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: payment-webhook-config
+              key: db.port
+        - name: DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: payment-webhook-config
+              key: db.name
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: payment-webhook-secrets
+              key: db.username
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: payment-webhook-secrets
+              key: db.password
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: payment-webhook-config
+              key: redis.host
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: payment-webhook-config
+              key: redis.port
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            configMapKeyRef:
+              name: payment-webhook-config
+              key: kafka.bootstrap-servers
+        - name: JWT_ISSUER_URI
+          valueFrom:
+            configMapKeyRef:
+              name: payment-webhook-config
+              key: jwt.issuer-uri
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10

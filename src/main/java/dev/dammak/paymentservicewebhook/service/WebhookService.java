@@ -5,9 +5,11 @@ import dev.dammak.paymentservicewebhook.entity.Merchant;
 import dev.dammak.paymentservicewebhook.entity.WebhookEndpoint;
 import dev.dammak.paymentservicewebhook.exception.WebhookException;
 import dev.dammak.paymentservicewebhook.mapper.WebhookMapper;
+import dev.dammak.paymentservicewebhook.entity.WebhookEvent;
 import dev.dammak.paymentservicewebhook.repository.EventSubscriptionRepository;
 import dev.dammak.paymentservicewebhook.repository.MerchantRepository;
 import dev.dammak.paymentservicewebhook.repository.WebhookEndpointRepository;
+import dev.dammak.paymentservicewebhook.repository.WebhookEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.common.errors.ResourceNotFoundException;
@@ -39,6 +41,7 @@ public class WebhookService {
     private final WebhookEndpointRepository endpointRepository;
     private final EventSubscriptionRepository subscriptionRepository;
     private final MerchantRepository merchantRepository;
+    private final WebhookEventRepository eventRepository;
     private final WebhookMapper mapper;
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -173,5 +176,24 @@ public class WebhookService {
                 .successRate(0.0)
                 .averageLatencyMs(0.0)
                 .build();
+    }
+
+    /**
+     * Updates the status of a webhook event
+     * 
+     * @param eventId the ID of the event to update
+     * @param status the new status for the event
+     * @throws ResourceNotFoundException if the event is not found
+     */
+    public void updateEventStatus(UUID eventId, WebhookEvent.EventStatus status) {
+        log.info("Updating event status for event: {} to status: {}", eventId, status);
+        
+        // Check if event exists
+        if (!eventRepository.existsById(eventId)) {
+            throw new ResourceNotFoundException("Webhook event not found with ID: " + eventId);
+        }
+        
+        // Update the status using the repository method
+        eventRepository.updateStatus(eventId, status);
     }
 }
