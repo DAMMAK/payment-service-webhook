@@ -5,8 +5,8 @@ services:
     image: postgres:15-alpine
     environment:
       POSTGRES_DB: webhook_db
-      POSTGRES_USER: webhook_user
-      POSTGRES_PASSWORD: webhook_pass
+      POSTGRES_USER: d2ViaG9va191c2Vy
+      POSTGRES_PASSWORD: d2ViaG9va19wYXNz
     ports:
       - "5432:5432"
     volumes:

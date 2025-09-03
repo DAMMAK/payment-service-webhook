@@ -1,8 +1,8 @@
 spring:
   datasource:
     url: jdbc:postgresql://${DB_HOST:postgres-service}:${DB_PORT:5432}/${DB_NAME:webhook_db}
-    username: ${DB_USERNAME:webhook_user}
-    password: ${DB_PASSWORD:webhook_pass}
+    username: ${DB_USERNAME:d2ViaG9va191c2Vy}
+    password: ${DB_PASSWORD:d2ViaG9va19wYXNz}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 50

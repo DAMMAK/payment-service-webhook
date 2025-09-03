@@ -1,0 +1,309 @@
+# ArgoCD Application for Payment Service Webhook
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: payment-service-webhook
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/DAMMAK/payment-service-webhook
+    targetRevision: HEAD
+    path: k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: payment-service
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+# Namespace for the application
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: payment-service
+---
+# PostgreSQL ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: payment-service
+data:
+  POSTGRES_DB: "webhook_db"
+  POSTGRES_USER: "d2ViaG9va191c2Vy"
+---
+# PostgreSQL Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: payment-service
+type: Opaque
+data:
+  POSTGRES_PASSWORD: d2ViaG9va19wYXNz  # password123 base64 encoded
+---
+# PostgreSQL PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: payment-service
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+# PostgreSQL Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: payment-service
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: postgres-config
+            - secretRef:
+                name: postgres-secret
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - postgres
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - postgres
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+---
+# PostgreSQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: payment-service
+  labels:
+    app: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+  type: ClusterIP
+---
+# Application ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-webhook-config
+  namespace: payment-service
+data:
+  SPRING_PROFILES_ACTIVE: "kubernetes"
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres-service:5432/webhook_db"
+  SPRING_DATASOURCE_USERNAME: "d2ViaG9va191c2Vy"
+  SPRING_DATASOURCE_DRIVER_CLASS_NAME: "org.postgresql.Driver"
+  SPRING_JPA_HIBERNATE_DDL_AUTO: "validate"
+  SPRING_JPA_DATABASE_PLATFORM: "org.hibernate.dialect.PostgreSQLDialect"
+  SPRING_FLYWAY_URL: "jdbc:postgresql://postgres-service:5432/webhook_db"
+  SPRING_FLYWAY_USER: "d2ViaG9va191c2Vy"
+---
+# Application Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: payment-webhook-secret
+  namespace: payment-service
+type: Opaque
+data:
+  SPRING_DATASOURCE_PASSWORD: d2ViaG9va19wYXNz # password123 base64 encoded
+  SPRING_FLYWAY_PASSWORD: d2ViaG9va19wYXNz      # password123 base64 encoded
+---
+# Payment Service Webhook Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service-webhook
+  namespace: payment-service
+  labels:
+    app: payment-service-webhook
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: payment-service-webhook
+  template:
+    metadata:
+      labels:
+        app: payment-service-webhook
+    spec:
+      containers:
+        - name: payment-service-webhook
+          image: dammak/payment-service-webhook:main
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: payment-webhook-config
+            - secretRef:
+                name: payment-webhook-secret
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:15
+          command: ['sh', '-c']
+          args:
+            - |
+              until pg_isready -h postgres-service -p 5432 -U postgres; do
+                echo "Waiting for postgres..."
+                sleep 2
+              done
+          envFrom:
+            - secretRef:
+                name: postgres-secret
+---
+# Payment Service Webhook Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-service-webhook-service
+  namespace: payment-service
+  labels:
+    app: payment-service-webhook
+spec:
+  selector:
+    app: payment-service-webhook
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+  type: ClusterIP
+---
+# Ingress (optional - uncomment if you have an ingress controller)
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: payment-service-webhook-ingress
+#   namespace: payment-service
+#   annotations:
+#     nginx.ingress.kubernetes.io/rewrite-target: /
+#     cert-manager.io/cluster-issuer: letsencrypt-prod
+# spec:
+#   tls:
+#   - hosts:
+#     - payment-webhook.yourdomain.com
+#     secretName: payment-webhook-tls
+#   rules:
+#   - host: payment-webhook.yourdomain.com
+#     http:
+#       paths:
+#       - path: /
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: payment-service-webhook-service
+#             port:
+#               number: 80
+---
+# HorizontalPodAutoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: payment-service-webhook-hpa
+  namespace: payment-service
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: payment-service-webhook
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
