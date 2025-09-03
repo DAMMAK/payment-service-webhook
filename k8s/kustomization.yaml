@@ -10,7 +10,6 @@ resources:
   - postgres.yaml
   - redis.yaml
   - kafka-deployment.yaml
-  - kafka-service.yaml
   - zookeeper-deployment.yaml
   - deployment.yaml
   - service.yaml
