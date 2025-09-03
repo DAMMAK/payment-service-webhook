@@ -31,8 +31,8 @@ spring:
     baseline-on-migrate: true
 
   redis:
-    host: ${REDIS_HOST:redis-service}
-    port: ${REDIS_PORT:6379}
+    host: ${SPRING_REDIS_HOST:redis-service}
+    port: ${SPRING_REDIS_PORT:6379}
     password: ${REDIS_PASSWORD:}
     timeout: 2000ms
     lettuce:

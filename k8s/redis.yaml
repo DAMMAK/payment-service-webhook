@@ -15,6 +15,7 @@ metadata:
   name: redis
   namespace: default
 spec:
+  replicas: 1
   selector:
     matchLabels:
       app: redis
