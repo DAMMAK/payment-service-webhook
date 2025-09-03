@@ -1,9 +1,6 @@
 spring:
-  application:
-    name: payment-service-webhook
-
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:webhook_db}
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:webhook_db}
     username: ${DB_USERNAME:webhook_user}
     password: ${DB_PASSWORD:webhook_pass}
     driver-class-name: org.postgresql.Driver
@@ -34,7 +31,7 @@ spring:
     baseline-on-migrate: true
 
   redis:
-    host: ${REDIS_HOST:localhost}
+    host: ${REDIS_HOST:redis}
     port: ${REDIS_PORT:6379}
     password: ${REDIS_PASSWORD:}
     timeout: 2000ms
@@ -45,7 +42,7 @@ spring:
         min-idle: 2
 
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -75,23 +72,6 @@ management:
     tags:
       application: ${spring.application.name}
 
-springdoc:
-  swagger-ui:
-    path: /swagger-ui.html
-    tags-sorter: alpha
-    operations-sorter: method
-    deep-linking: false
-    display-request-duration: true
-  api-docs:
-    path: /v3/api-docs
-  show-actuator: true
-  default-consumes-media-type: application/json
-  default-produces-media-type: application/json
-  paths-to-match:
-    - /api/v1/**
-  packages-to-scan:
-    - dev.dammak.paymentservicewebhook.controller
-
 webhook:
   retry:
     max-attempts: 3
@@ -106,12 +86,3 @@ webhook:
   security:
     signature-algorithm: HmacSHA256
     token-expiry: 3600
-
-logging:
-  level:
-    com.payment.webhook: DEBUG
-    org.springframework.web: INFO
-    org.hibernate: WARN
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} - %logger{36} - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
