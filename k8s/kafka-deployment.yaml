@@ -19,6 +19,8 @@ spec:
           ports:
             - containerPort: 9092
           env:
+            - name: "CLUSTER_ID"
+              value: "MkU3OEVBNTcwNTJENDM2Qk"
             - name: KAFKA_PROCESS_ROLES
               value: "broker,controller"
             - name: KAFKA_NODE_ID
