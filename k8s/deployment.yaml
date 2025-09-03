@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: payment-service-webhook
-          image: your-registry/payment-service-webhook:latest
+          image: dammak/payment-service-webhook:main
           ports:
             - containerPort: 8080
           env:
