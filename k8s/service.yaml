@@ -1,15 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: payment-webhook-service
-  namespace: payment-webhook
-  labels:
-    app: payment-webhook
+  name: payment-service-webhook
+  namespace: default
 spec:
-  selector:
-    app: payment-webhook
+  type: LoadBalancer
   ports:
-    - protocol: TCP
-      port: 80
+    - port: 80
       targetPort: 8080
-  type: ClusterIP
+  selector:
+    app: payment-service-webhook

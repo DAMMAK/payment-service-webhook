@@ -1,12 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: payment-webhook
+namespace: default
 
 resources:
-  - namespace.yaml
+  - secret.yaml
   - configmap.yaml
-  - secrets.yaml
+  - postgres.yaml
+  - redis.yaml
   - deployment.yaml
   - service.yaml
-  - ingress.yaml
