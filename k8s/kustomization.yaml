@@ -11,3 +11,6 @@ resources:
   - redis.yaml
   - deployment.yaml
   - service.yaml
+  - kafka-deployment.yaml
+  - kafka-service.yaml
+  - zookeeper-deployment.yaml
