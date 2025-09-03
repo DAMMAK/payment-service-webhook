@@ -288,6 +288,32 @@ Key metrics include:
 - Error rates
 - Resource utilization
 
+## GitHub Actions
+
+This repository includes GitHub Actions for continuous integration and container image building:
+
+1. **CI Workflow** (`ci.yml`): Runs tests on every pull request and push to main branch
+2. **Docker Build and Push** (`docker-build-push.yml`): Builds and pushes Docker images to GitHub Container Registry on release creation
+3. **Docker Hub Push** (`docker-hub-build-push.yml`): Alternative workflow to push images to Docker Hub
+
+The workflows automatically trigger on:
+- Pushes to the main branch (excluding documentation changes)
+- Creation of new releases
+- Manual triggering
+
+### Secrets Required
+
+For Docker Hub deployment, you'll need to set the following secrets in your repository:
+- `DOCKERHUB_USERNAME`: Your Docker Hub username
+- `DOCKERHUB_TOKEN`: Your Docker Hub access token
+
+### Container Images
+
+Container images are automatically built and tagged with:
+- Branch name for branch builds
+- Semantic version for releases
+- Commit SHA for development builds
+
 ## Contributing
 
 1. Fork the repository
