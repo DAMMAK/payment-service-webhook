@@ -5,6 +5,12 @@ import dev.dammak.paymentservicewebhook.dto.WebhookEventDTO;
 import dev.dammak.paymentservicewebhook.service.EventProcessingService;
 import dev.dammak.paymentservicewebhook.service.SignatureService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -28,18 +34,37 @@ import java.util.Map;
 @RequestMapping("/api/v1/webhooks/providers")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Provider Webhooks", description = "Receive webhooks from payment providers")
+@Tag(name = "Provider Webhooks", description = "Receive and process webhooks from external payment providers")
 public class ProviderWebhookController {
 
     private final EventProcessingService eventProcessingService;
     private final SignatureService signatureService;
 
     @PostMapping("/{provider}/events")
-    @Operation(summary = "Receive webhook from payment provider")
+    @Operation(
+            summary = "Receive webhook from payment provider",
+            description = "Endpoint for payment providers to send webhook events. Supports Stripe, PayPal, and Razorpay providers."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Webhook event accepted successfully",
+                    content = {@Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class))}),
+            @ApiResponse(responseCode = "400", description = "Invalid webhook data or signature verification failed",
+                    content = {@Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class))})
+    })
     public ResponseEntity<Map<String, Object>> receiveWebhook(
+            @Parameter(description = "Payment provider name (stripe, paypal, razorpay)", in = ParameterIn.PATH, required = true)
             @PathVariable String provider,
+            @Parameter(description = "Provider-specific signature for verification", in = ParameterIn.HEADER, required = false)
             @RequestHeader(value = "X-Signature", required = false) String signature,
+            @Parameter(description = "Idempotency key to prevent duplicate processing", in = ParameterIn.HEADER, required = false)
             @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Webhook event payload from the payment provider",
+                    required = true,
+                    content = @Content(schema = @Schema(implementation = Map.class))
+            )
             @RequestBody Map<String, Object> payload,
             HttpServletRequest request) {
 
@@ -84,6 +109,7 @@ public class ProviderWebhookController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
         }
     }
+    
 
     private void verifyProviderSignature(String provider, Map<String, Object> payload, String signature) {
         // Provider-specific signature verification logic

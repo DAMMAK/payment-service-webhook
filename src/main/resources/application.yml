@@ -78,6 +78,23 @@ management:
     tags:
       application: ${spring.application.name}
 
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+    deep-linking: false
+    display-request-duration: true
+  api-docs:
+    path: /v3/api-docs
+  show-actuator: true
+  default-consumes-media-type: application/json
+  default-produces-media-type: application/json
+  paths-to-match:
+    - /api/v1/**
+  packages-to-scan:
+    - dev.dammak.paymentservicewebhook.controller
+
 webhook:
   retry:
     max-attempts: 3
