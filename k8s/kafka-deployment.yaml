@@ -1,3 +1,4 @@
+# kafka-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -13,25 +14,35 @@ spec:
       labels:
         app: kafka
     spec:
+      initContainers:
+        - name: wait-for-zookeeper
+          image: busybox:1.35
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z zookeeper-service 2181; do
+                echo "Waiting for Zookeeper to be ready..."
+                sleep 2
+              done
+              echo "Zookeeper is ready!"
       containers:
         - name: kafka
-          image: confluentinc/cp-kafka:latest
+          image: confluentinc/cp-kafka:7.5.0
           ports:
             - containerPort: 9092
               name: plaintext
-            - containerPort: 29092
-              name: internal
           env:
             - name: KAFKA_BROKER_ID
               value: "1"
             - name: KAFKA_ZOOKEEPER_CONNECT
               value: "zookeeper-service:2181"
-            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
-              value: "PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT"
-            - name: KAFKA_ADVERTISED_LISTENERS
-              value: "PLAINTEXT://kafka-service:9092,PLAINTEXT_INTERNAL://localhost:29092"
             - name: KAFKA_LISTENERS
-              value: "PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092"
+              value: "PLAINTEXT://0.0.0.0:9092"
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: "PLAINTEXT://kafka-service:9092"
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: "PLAINTEXT:PLAINTEXT"
             - name: KAFKA_INTER_BROKER_LISTENER_NAME
               value: "PLAINTEXT"
             - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
@@ -44,12 +55,55 @@ spec:
               value: "0"
             - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
               value: "true"
+            - name: KAFKA_LOG_DIRS
+              value: "/var/lib/kafka/data"
             - name: KAFKA_LOG_RETENTION_HOURS
               value: "168"
-            - name: KAFKA_LOG_SEGMENT_BYTES
-              value: "1073741824"
-            - name: KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS
-              value: "300000"
+            - name: CONFLUENT_METRICS_ENABLE
+              value: "false"
+            - name: CONFLUENT_SUPPORT_CUSTOMER_ID
+              value: "anonymous"
+            # Additional important settings
+            - name: KAFKA_NUM_PARTITIONS
+              value: "1"
+            - name: KAFKA_DEFAULT_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_MIN_INSYNC_REPLICAS
+              value: "1"
+          volumeMounts:
+            - name: kafka-data
+              mountPath: /var/lib/kafka/data
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "kafka-broker-api-versions --bootstrap-server localhost:9092"
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "kafka-broker-api-versions --bootstrap-server localhost:9092"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+      volumes:
+        - name: kafka-data
+          emptyDir: {}
+
 ---
 apiVersion: v1
 kind: Service
