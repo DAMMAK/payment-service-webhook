@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: payment-service-webhook
-  namespace: default
+  namespace: payment-webhook
 spec:
   replicas: 3
   selector:
@@ -31,18 +31,18 @@ spec:
                 secretKeyRef:
                   name: payment-service-secret
                   key: DB_PASSWORD
-            - name: SPRING_DATASOURCE_URL
-              value: "jdbc:postgresql://postgres-service:5432/payment_webhook_db"
-            - name: SPRING_DATASOURCE_DRIVER_CLASS_NAME
-              value: "org.postgresql.Driver"
-            - name: SPRING_REDIS_HOST
+            - name: DB_HOST
+              value: "postgres-service"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: "payment_webhook_db"
+            - name: REDIS_HOST
               value: "redis-service"
-            - name: SPRING_REDIS_PORT
+            - name: REDIS_PORT
               value: "6379"
-          volumeMounts:
-            - name: config
-              mountPath: /config
-              readOnly: true
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka-service:9092"
           resources:
             requests:
               memory: "512Mi"
@@ -62,7 +62,3 @@ spec:
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 5
-      volumes:
-        - name: config
-          configMap:
-            name: payment-service-config

@@ -6,10 +6,10 @@ namespace: payment-webhook
 resources:
   - secrets.yaml
   - configmap.yaml
-  - namespace.yaml
   - postgres.yaml
   - redis.yaml
   - kafka-deployment.yaml
   - zookeeper-deployment.yaml
   - deployment.yaml
   - service.yaml
+  - argocd-application.yaml

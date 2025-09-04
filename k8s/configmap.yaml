@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: payment-service-config
-  namespace: default
+  namespace: payment-webhook
 data:
   application-kubernetes.yml: |
     spring:
