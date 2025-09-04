@@ -1,4 +1,4 @@
-FROM openjdk:17-jdk-slim as builder
+FROM openjdk:18-jdk-slim as builder
 LABEL authors="damola.adekoya"
 
 WORKDIR /app
@@ -13,7 +13,7 @@ COPY src src
 
 RUN ./mvnw clean package -DskipTests
 
-FROM openjdk:17-jdk-slim
+FROM openjdk:18-jdk-slim
 
 WORKDIR /app
 
