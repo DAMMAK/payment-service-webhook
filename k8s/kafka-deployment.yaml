@@ -63,13 +63,12 @@ spec:
               value: "false"
             - name: CONFLUENT_SUPPORT_CUSTOMER_ID
               value: "anonymous"
-            # Additional important settings
-            - name: KAFKA_NUM_PARTITIONS
-              value: "1"
-            - name: KAFKA_DEFAULT_REPLICATION_FACTOR
-              value: "1"
-            - name: KAFKA_MIN_INSYNC_REPLICAS
-              value: "1"
+            - name: KAFKA_JMX_PORT
+              value: "9999"
+            - name: KAFKA_JMX_HOSTNAME
+              value: "localhost"
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xmx512M -Xms512M"
           volumeMounts:
             - name: kafka-data
               mountPath: /var/lib/kafka/data
