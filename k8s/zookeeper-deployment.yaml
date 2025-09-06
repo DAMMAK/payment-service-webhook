@@ -1,8 +1,10 @@
 # ==========================================
 # zookeeper-deployment.yaml
 # ==========================================
+# For production, consider using StatefulSet instead of Deployment
+# Using StatefulSet for now as it's better suited for Zookeeper
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: zookeeper
   namespace: payment-webhook
@@ -10,9 +12,11 @@ metadata:
     app.kubernetes.io/name: zookeeper
     app.kubernetes.io/managed-by: argocd
 spec:
-  replicas: 1
-  strategy:
-    type: Recreate
+  serviceName: zookeeper-headless  # Required for StatefulSet
+  replicas: 1  # For production, use 3 or 5 for proper quorum
+  podManagementPolicy: OrderedReady
+  updateStrategy:
+    type: RollingUpdate
   selector:
     matchLabels:
       app: zookeeper
@@ -29,9 +33,14 @@ spec:
       containers:
         - name: zookeeper
           image: confluentinc/cp-zookeeper:7.5.0
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 2181
               name: client
+            - containerPort: 2888
+              name: follower
+            - containerPort: 3888
+              name: election
           env:
             - name: ZOOKEEPER_CLIENT_PORT
               value: "2181"
@@ -43,6 +52,18 @@ spec:
               value: "5"
             - name: ZOOKEEPER_SYNC_LIMIT
               value: "2"
+            # Additional recommended configurations
+            - name: ZOOKEEPER_AUTOPURGE_PURGE_INTERVAL
+              value: "24"
+            - name: ZOOKEEPER_AUTOPURGE_SNAP_RETAIN_COUNT
+              value: "3"
+            - name: ZOOKEEPER_MAX_CLIENT_CNXNS
+              value: "60"
+            - name: ZOOKEEPER_4LW_COMMANDS_WHITELIST
+              value: "ruok, mntr, srvr, stat"
+            # For single node, we need to specify standalone mode
+            - name: ZOOKEEPER_SERVERS
+              value: "server.1=0.0.0.0:2888:3888;2181"
           volumeMounts:
             - name: zookeeper-data
               mountPath: /var/lib/zookeeper/data
@@ -60,6 +81,7 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
+            successThreshold: 1
           readinessProbe:
             exec:
               command:
@@ -70,29 +92,77 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 5
             failureThreshold: 3
+            successThreshold: 1
           resources:
             requests:
-              memory: "256Mi"
+              memory: "256Mi"  # Increased from 128Mi
               cpu: "100m"
             limits:
-              memory: "512Mi"
-              cpu: "500m"
+              memory: "512Mi"  # Increased from 256Mi
+              cpu: "500m"     # Increased from 250m
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+      terminationGracePeriodSeconds: 30
       volumes:
-        - name: zookeeper-data
-          emptyDir: {}
-        - name: zookeeper-logs
-          emptyDir: {}
         - name: tmp
           emptyDir: {}
+  # Use volumeClaimTemplates for persistent storage
+  volumeClaimTemplates:
+    - metadata:
+        name: zookeeper-data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 5Gi
+    - metadata:
+        name: zookeeper-logs
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 2Gi
 
 ---
+# Headless service for StatefulSet
 apiVersion: v1
 kind: Service
 metadata:
-  name: zookeeper-service
+  name: zookeeper-headless
+  namespace: payment-webhook
+  labels:
+    app.kubernetes.io/name: zookeeper
+    app.kubernetes.io/managed-by: argocd
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service
+  publishNotReadyAddresses: true
+  ports:
+    - name: client
+      port: 2181
+      targetPort: 2181
+      protocol: TCP
+    - name: follower
+      port: 2888
+      targetPort: 2888
+      protocol: TCP
+    - name: election
+      port: 3888
+      targetPort: 3888
+      protocol: TCP
+  selector:
+    app: zookeeper
+
+---
+# Regular service for client connections
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper
   namespace: payment-webhook
   labels:
     app.kubernetes.io/name: zookeeper
@@ -106,5 +176,3 @@ spec:
       protocol: TCP
   selector:
     app: zookeeper
-
----
