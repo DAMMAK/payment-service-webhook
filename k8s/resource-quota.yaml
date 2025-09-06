@@ -1,0 +1,23 @@
+# ==========================================
+# resource-quota.yaml
+# ==========================================
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: payment-webhook-quota
+  namespace: payment-webhook
+  labels:
+    app.kubernetes.io/managed-by: argocd
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 4Gi
+    limits.cpu: "4"
+    limits.memory: 8Gi
+    persistentvolumeclaims: "2"
+    pods: "10"
+    services: "6"
+    secrets: "5"
+    configmaps: "5"
+
+---

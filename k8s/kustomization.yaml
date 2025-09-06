@@ -3,13 +3,60 @@ kind: Kustomization
 
 namespace: payment-webhook
 
+metadata:
+  name: payment-webhook-kustomization
+  annotations:
+    config.kubernetes.io/local-config: "true"
+
 resources:
+  # Core resources
+  - namespace.yaml
   - secrets.yaml
   - configmap.yaml
+
+  # Database and cache
   - postgres.yaml
   - redis.yaml
-  - kafka-deployment.yaml
+
+  # Message queue
   - zookeeper-deployment.yaml
+  - kafka-deployment.yaml
+
+  # Main application
   - deployment.yaml
   - service.yaml
-  - argocd-application.yaml
+
+  # Optional resources (uncomment as needed)
+  - resource-quota.yaml
+  - pod-disruption-budget.yaml
+  - horizontal-pod-autoscaler.yaml
+  - network-policy.yaml  # Uncomment if you need network policies
+  - ingress.yaml         # Uncomment if using Ingress instead of LoadBalancer
+  - service-monitor.yaml # Uncomment if using Prometheus monitoring
+  - prometheus-rule.yaml # Uncomment if using Prometheus alerting
+
+commonLabels:
+  app.kubernetes.io/part-of: payment-webhook-system
+  app.kubernetes.io/managed-by: argocd
+
+images:
+  - name: dammak/payment-service-webhook
+    newTag: main
+
+# Resource patches for different environments
+patchesStrategicMerge: []
+
+# JSON patches for specific modifications
+patchesJson6902: []
+
+# Generate additional ConfigMaps if needed
+configMapGenerator: []
+
+# Generate additional Secrets if needed
+secretGenerator: []
+
+# Namespace-wide resource transformations
+transformers: []
+
+# Validation rules
+validators: []

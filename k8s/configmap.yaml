@@ -1,25 +1,87 @@
+# ==========================================
+# configmap.yaml
+# ==========================================
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: payment-service-config
   namespace: payment-webhook
+  labels:
+    app.kubernetes.io/name: payment-service
+    app.kubernetes.io/managed-by: argocd
 data:
-  application-kubernetes.yml: |
+  application.yml: |
     spring:
       datasource:
         url: jdbc:postgresql://postgres-service:5432/payment_webhook_db
         username: ${DB_USERNAME}
         password: ${DB_PASSWORD}
         driver-class-name: org.postgresql.Driver
+        hikari:
+          maximum-pool-size: 20
+          minimum-idle: 5
+          connection-timeout: 30000
+          idle-timeout: 600000
+          max-lifetime: 1800000
+      
       jpa:
         hibernate:
           ddl-auto: validate
         properties:
           hibernate:
             dialect: org.hibernate.dialect.PostgreSQLDialect
+            format_sql: false
+        show-sql: false
+        open-in-view: false
+      
       flyway:
         enabled: true
         baseline-on-migrate: true
+        locations: classpath:db/migration
+      
       redis:
         host: redis-service
         port: 6379
+        password: ${REDIS_PASSWORD:}
+        timeout: 5000ms
+        lettuce:
+          pool:
+            max-active: 8
+            max-idle: 8
+            min-idle: 2
+      
+      kafka:
+        bootstrap-servers: kafka-service:9092
+        producer:
+          key-serializer: org.apache.kafka.common.serialization.StringSerializer
+          value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+          acks: all
+          retries: 3
+        consumer:
+          group-id: payment-webhook-service
+          key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+          value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+          auto-offset-reset: earliest
+    
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: health,info,metrics,prometheus
+      endpoint:
+        health:
+          probes:
+            enabled: true
+      health:
+        readiness-state:
+          enabled: true
+        liveness-state:
+          enabled: true
+    
+    logging:
+      level:
+        com.dammak.paymentservice: INFO
+        org.springframework.kafka: WARN
+        org.hibernate.SQL: WARN
+
+---

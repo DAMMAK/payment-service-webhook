@@ -1,11 +1,18 @@
+# ==========================================
 # kafka-deployment.yaml
+# ==========================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kafka
   namespace: payment-webhook
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/managed-by: argocd
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: kafka
@@ -13,7 +20,12 @@ spec:
     metadata:
       labels:
         app: kafka
+        app.kubernetes.io/name: kafka
     spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
       initContainers:
         - name: wait-for-zookeeper
           image: busybox:1.35
@@ -22,16 +34,20 @@ spec:
             - -c
             - |
               echo "Waiting for Zookeeper to be ready..."
-              for i in $(seq 1 300); do
+              for i in $(seq 1 180); do
                 if nc -z zookeeper-service 2181; then
                   echo "Zookeeper is ready!"
                   exit 0
                 fi
-                echo "Waiting for Zookeeper... ($i/300)"
+                echo "Waiting for Zookeeper... ($i/180)"
                 sleep 2
               done
-              echo "Zookeeper failed to start within 600 seconds"
+              echo "Zookeeper failed to start within 360 seconds"
               exit 1
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
       containers:
         - name: kafka
           image: confluentinc/cp-kafka:7.5.0
@@ -75,15 +91,19 @@ spec:
               value: "localhost"
             - name: KAFKA_HEAP_OPTS
               value: "-Xmx512M -Xms512M"
+            - name: KAFKA_LOG4J_LOGGERS
+              value: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
           volumeMounts:
             - name: kafka-data
               mountPath: /var/lib/kafka/data
+            - name: tmp
+              mountPath: /tmp
           livenessProbe:
             exec:
               command:
                 - sh
                 - -c
-                - "kafka-broker-api-versions --bootstrap-server kafka-service:9092"
+                - "kafka-broker-api-versions --bootstrap-server localhost:9092"
             initialDelaySeconds: 60
             periodSeconds: 30
             timeoutSeconds: 10
@@ -93,7 +113,7 @@ spec:
               command:
                 - sh
                 - -c
-                - "kafka-broker-api-versions --bootstrap-server kafka-service:9092"
+                - "kafka-broker-api-versions --bootstrap-server localhost:9092"
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 10
@@ -105,8 +125,13 @@ spec:
             limits:
               memory: "1Gi"
               cpu: "1000m"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
       volumes:
         - name: kafka-data
+          emptyDir: {}
+        - name: tmp
           emptyDir: {}
 
 ---
@@ -115,12 +140,17 @@ kind: Service
 metadata:
   name: kafka-service
   namespace: payment-webhook
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/managed-by: argocd
 spec:
-  selector:
-    app: kafka
+  type: ClusterIP
   ports:
     - name: kafka
       port: 9092
       targetPort: 9092
       protocol: TCP
-  type: ClusterIP
+  selector:
+    app: kafka
+
+---

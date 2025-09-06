@@ -1,20 +1,35 @@
+# ==========================================
+# postgres.yaml
+# ==========================================
 apiVersion: v1
-kind: Service
+kind: PersistentVolumeClaim
 metadata:
-  name: postgres-service
+  name: postgres-pvc
   namespace: payment-webhook
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/managed-by: argocd
 spec:
-  ports:
-    - port: 5432
-  selector:
-    app: postgres
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+#  storageClassName:   # Change based on your cluster
+
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: postgres
   namespace: payment-webhook
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/managed-by: argocd
 spec:
+  replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: postgres
@@ -22,12 +37,16 @@ spec:
     metadata:
       labels:
         app: postgres
+        app.kubernetes.io/name: postgres
     spec:
+#      securityContext:
+#        fsGroup: 999
       containers:
         - name: postgres
-          image: postgres:14
+          image: postgres:15-alpine
           ports:
             - containerPort: 5432
+              name: postgres
           env:
             - name: POSTGRES_DB
               value: payment_webhook_db
@@ -41,22 +60,69 @@ spec:
                 secretKeyRef:
                   name: payment-service-secret
                   key: DB_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           volumeMounts:
             - mountPath: /var/lib/postgresql/data
               name: postgres-storage
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - $(POSTGRES_USER)
+                - -d
+                - $(POSTGRES_DB)
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - $(POSTGRES_USER)
+                - -d
+                - $(POSTGRES_DB)
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 3
+#          securityContext:
+#            runAsUser: 999
+#            runAsGroup: 999
+#            allowPrivilegeEscalation: false
+#            readOnlyRootFilesystem: false
       volumes:
         - name: postgres-storage
           persistentVolumeClaim:
             claimName: postgres-pvc
+
 ---
 apiVersion: v1
-kind: PersistentVolumeClaim
+kind: Service
 metadata:
-  name: postgres-pvc
+  name: postgres-service
   namespace: payment-webhook
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/managed-by: argocd
 spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 5Gi
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+      name: postgres
+  selector:
+    app: postgres
+
+---

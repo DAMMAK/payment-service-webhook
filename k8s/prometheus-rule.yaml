@@ -1,0 +1,43 @@
+# ==========================================
+# prometheus-rule.yaml (Alerting rules)
+# ==========================================
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: payment-service-alerts
+  namespace: payment-webhook
+  labels:
+    app.kubernetes.io/name: payment-service-webhook
+    app.kubernetes.io/managed-by: argocd
+spec:
+  groups:
+    - name: payment-service.rules
+      rules:
+        - alert: PaymentServiceDown
+          expr: up{job="payment-service-webhook"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Payment service is down"
+            description: "Payment service has been down for more than 2 minutes"
+
+        - alert: PaymentServiceHighMemory
+          expr: (container_memory_usage_bytes{container="payment-service-webhook"} / container_spec_memory_limit_bytes{container="payment-service-webhook"}) > 0.9
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Payment service high memory usage"
+            description: "Payment service memory usage is above 90% for more than 5 minutes"
+
+        - alert: PaymentServiceHighCPU
+          expr: rate(container_cpu_usage_seconds_total{container="payment-service-webhook"}[5m]) > 0.8
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Payment service high CPU usage"
+            description: "Payment service CPU usage is above 80% for more than 5 minutes"
+
+---

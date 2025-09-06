@@ -1,11 +1,18 @@
+# ==========================================
 # zookeeper-deployment.yaml
+# ==========================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: zookeeper
   namespace: payment-webhook
+  labels:
+    app.kubernetes.io/name: zookeeper
+    app.kubernetes.io/managed-by: argocd
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: zookeeper
@@ -13,12 +20,18 @@ spec:
     metadata:
       labels:
         app: zookeeper
+        app.kubernetes.io/name: zookeeper
     spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
       containers:
         - name: zookeeper
           image: confluentinc/cp-zookeeper:7.5.0
           ports:
             - containerPort: 2181
+              name: client
           env:
             - name: ZOOKEEPER_CLIENT_PORT
               value: "2181"
@@ -26,21 +39,33 @@ spec:
               value: "2000"
             - name: ZOOKEEPER_SERVER_ID
               value: "1"
+            - name: ZOOKEEPER_INIT_LIMIT
+              value: "5"
+            - name: ZOOKEEPER_SYNC_LIMIT
+              value: "2"
           volumeMounts:
             - name: zookeeper-data
               mountPath: /var/lib/zookeeper/data
             - name: zookeeper-logs
               mountPath: /var/lib/zookeeper/log
+            - name: tmp
+              mountPath: /tmp
           livenessProbe:
-            tcpSocket:
-              port: 2181
+            exec:
+              command:
+                - sh
+                - -c
+                - "echo ruok | nc localhost 2181 | grep imok"
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
           readinessProbe:
-            tcpSocket:
-              port: 2181
+            exec:
+              command:
+                - sh
+                - -c
+                - "echo ruok | nc localhost 2181 | grep imok"
             initialDelaySeconds: 10
             periodSeconds: 5
             timeoutSeconds: 5
@@ -52,10 +77,15 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
       volumes:
         - name: zookeeper-data
           emptyDir: {}
         - name: zookeeper-logs
+          emptyDir: {}
+        - name: tmp
           emptyDir: {}
 
 ---
@@ -64,11 +94,17 @@ kind: Service
 metadata:
   name: zookeeper-service
   namespace: payment-webhook
+  labels:
+    app.kubernetes.io/name: zookeeper
+    app.kubernetes.io/managed-by: argocd
 spec:
-  selector:
-    app: zookeeper
+  type: ClusterIP
   ports:
-    - name: zookeeper
+    - name: client
       port: 2181
       targetPort: 2181
-  type: ClusterIP
+      protocol: TCP
+  selector:
+    app: zookeeper
+
+---

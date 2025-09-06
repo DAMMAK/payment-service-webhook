@@ -1,0 +1,33 @@
+# ==========================================
+# pod-disruption-budget.yaml
+# ==========================================
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: payment-service-pdb
+  namespace: payment-webhook
+  labels:
+    app.kubernetes.io/name: payment-service-webhook
+    app.kubernetes.io/managed-by: argocd
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: payment-service-webhook
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: postgres-pdb
+  namespace: payment-webhook
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/managed-by: argocd
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: postgres
+
+---

@@ -1,6 +1,12 @@
+# ==========================================
+# namespace.yaml
+# ==========================================
 apiVersion: v1
 kind: Namespace
 metadata:
   name: payment-webhook
   labels:
     name: payment-webhook
+    app.kubernetes.io/managed-by: argocd
+
+---

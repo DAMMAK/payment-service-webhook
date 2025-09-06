@@ -1,14 +1,19 @@
+# ==========================================
+# argocd-application.yaml
+# ==========================================
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: payment-service-webhook
+  name: payment-webhook-service
   namespace: argocd
+  labels:
+    app.kubernetes.io/name: payment-webhook-service
 spec:
   project: default
   source:
-    repoURL: https://github.com/DAMMAK/payment-service-webhook.git
+    repoURL: https://github.com/DAMMAK/payment-service-webhook
     targetRevision: main
-    path: k8s
+    path: .
   destination:
     server: https://kubernetes.default.svc
     namespace: payment-webhook
@@ -16,5 +21,18 @@ spec:
     automated:
       prune: true
       selfHeal: true
+      allowEmpty: false
     syncOptions:
       - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 10
+
+---

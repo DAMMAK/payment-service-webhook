@@ -1,10 +1,22 @@
+# ==========================================
+# deployment.yaml (Payment Service)
+# ==========================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: payment-service-webhook
   namespace: payment-webhook
+  labels:
+    app.kubernetes.io/name: payment-service-webhook
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: argocd
 spec:
   replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: payment-service-webhook
@@ -12,12 +24,89 @@ spec:
     metadata:
       labels:
         app: payment-service-webhook
+        app.kubernetes.io/name: payment-service-webhook
+        version: "1.0.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/actuator/prometheus"
     spec:
+      securityContext:
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.35
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for PostgreSQL..."
+              for i in $(seq 1 60); do
+                if nc -z postgres-service 5432; then
+                  echo "PostgreSQL is ready!"
+                  exit 0
+                fi
+                echo "Waiting for PostgreSQL... ($i/60)"
+                sleep 2
+              done
+              echo "PostgreSQL failed to start within 120 seconds"
+              exit 1
+          securityContext:
+            runAsUser: 1001
+            runAsGroup: 1001
+            allowPrivilegeEscalation: false
+        - name: wait-for-redis
+          image: busybox:1.35
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Redis..."
+              for i in $(seq 1 30); do
+                if nc -z redis-service 6379; then
+                  echo "Redis is ready!"
+                  exit 0
+                fi
+                echo "Waiting for Redis... ($i/30)"
+                sleep 2
+              done
+              echo "Redis failed to start within 60 seconds"
+              exit 1
+          securityContext:
+            runAsUser: 1001
+            runAsGroup: 1001
+            allowPrivilegeEscalation: false
+        - name: wait-for-kafka
+          image: busybox:1.35
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Kafka..."
+              for i in $(seq 1 60); do
+                if nc -z kafka-service 9092; then
+                  echo "Kafka is ready!"
+                  exit 0
+                fi
+                echo "Waiting for Kafka... ($i/60)"
+                sleep 2
+              done
+              echo "Kafka failed to start within 120 seconds"
+              exit 1
+          securityContext:
+            runAsUser: 1001
+            runAsGroup: 1001
+            allowPrivilegeEscalation: false
       containers:
         - name: payment-service-webhook
           image: dammak/payment-service-webhook:main
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
+              name: http
+              protocol: TCP
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "kubernetes"
@@ -31,34 +120,76 @@ spec:
                 secretKeyRef:
                   name: payment-service-secret
                   key: DB_PASSWORD
-            - name: DB_HOST
-              value: "postgres-service"
-            - name: DB_PORT
-              value: "5432"
-            - name: DB_NAME
-              value: "payment_webhook_db"
-            - name: REDIS_HOST
-              value: "redis-service"
-            - name: REDIS_PORT
-              value: "6379"
-            - name: KAFKA_BOOTSTRAP_SERVERS
-              value: "kafka-service:9092"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-service-secret
+                  key: REDIS_PASSWORD
+            - name: JAVA_OPTS
+              value: "-Xmx768m -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app/config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
-              memory: "512Mi"
+              memory: "768Mi"
               cpu: "250m"
             limits:
               memory: "1Gi"
               cpu: "500m"
           livenessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/liveness
               port: 8080
-            initialDelaySeconds: 60
+            initialDelaySeconds: 90
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
           readinessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/readiness
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: config-volume
+          configMap:
+            name: payment-service-config
+        - name: tmp
+          emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - payment-service-webhook
+                topologyKey: kubernetes.io/hostname
+
+---
