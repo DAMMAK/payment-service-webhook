@@ -1,0 +1,20 @@
+# ==========================================
+# kafka-pvc.yaml
+# ==========================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kafka-storage
+  namespace: payment-webhook
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/managed-by: argocd
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  # storageClassName: your-storage-class # Uncomment and specify if needed
+
+---

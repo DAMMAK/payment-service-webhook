@@ -1,0 +1,95 @@
+# ==========================================
+# kafka-deployment.yaml
+# ==========================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+  namespace: payment-webhook
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/managed-by: argocd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kafka
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kafka
+    spec:
+      initContainers:
+        - name: kafka-init
+          image: confluentinc/cp-kafka:7.4.0
+          command:
+            - /bin/bash
+            - -c
+            - |
+              # Format the storage directory for KRaft
+              if [ ! -f /kafka-logs/meta.properties ]; then
+                echo "Formatting Kafka storage for KRaft mode..."
+                /bin/kafka-storage format \
+                  --config /etc/kafka/server.properties \
+                  --cluster-id $(cat /proc/sys/kernel/random/uuid | tr -d '-' | head -c 22)
+              else
+                echo "Kafka storage already formatted"
+              fi
+          env:
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xmx512M -Xms512M"
+          volumeMounts:
+            - name: kafka-storage
+              mountPath: /kafka-logs
+            - name: kafka-config
+              mountPath: /etc/kafka
+      containers:
+        - name: kafka
+          image: confluentinc/cp-kafka:7.4.0
+          ports:
+            - containerPort: 9092
+              name: kafka
+            - containerPort: 9093
+              name: controller
+          env:
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xmx1G -Xms1G"
+            - name: KAFKA_OPTS
+              value: "-Dfile.encoding=UTF-8"
+          volumeMounts:
+            - name: kafka-storage
+              mountPath: /kafka-logs
+            - name: kafka-config
+              mountPath: /etc/kafka
+          command:
+            - /bin/bash
+            - -c
+            - |
+              # Start Kafka in KRaft mode
+              kafka-server-start /etc/kafka/server.properties
+          livenessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 20
+            periodSeconds: 5
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+      volumes:
+        - name: kafka-storage
+          emptyDir:
+            sizeLimit: 5Gi
+        - name: kafka-config
+          configMap:
+            name: kafka-config
+
+---
