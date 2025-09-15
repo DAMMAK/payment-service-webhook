@@ -29,7 +29,7 @@
     <properties>
         <java.version>17</java.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
-        <lombok.version>1.18.38</lombok.version>
+        <lombok.version>1.18.40</lombok.version>
         <lombok-mapstruct.version>0.2.0</lombok-mapstruct.version>
         <testcontainers.version>1.19.3</testcontainers.version>
         <resilience4j.version>2.1.0</resilience4j.version>
